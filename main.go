@@ -4,17 +4,48 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
+	"net/url"
 )
 
-type Results struct {
-	Deck                string
-	Name                string
-	OriginalReleaseDate string `json:"original_release_date"`
+var key string = "api_key=f10f942d8c6c6a04af3c3774e257daa795c10589"
+var searchURL string = "http://www.giantbomb.com/api/search/?"
+
+type ResultsGame struct {
+	APIDetailURL           string      `json:"api_detail_url"`
+	BoxArtImages           BoxArtImage `json:"image"`
+	Deck                   string
+	ExpectedReleaseDay     string       `json:"expected_release_day"`
+	ExpectedReleaseMonth   string       `json:"expected_release_month"`
+	ExpectedReleaseQuarter string       `json:"expected_release_quarter"`
+	ExpectedReleaseYear    string       `json:"expected_release_year"`
+	GameRatings            []GameRating `json:"original_game_rating"`
+	Name                   string
+	OriginalReleaseDate    string     `json:"original_release_date"`
+	Platfoms               []Platform `json:"platforms"`
+	SiteDetailURL          string     `json:"site_detail_url"`
+}
+
+type GameRating struct {
+	ID   int
+	Name string
+}
+
+type Platform struct {
+	APIDetailURL  string `json:"api_detail_url"`
+	Name          string
+	SiteDetailURL string `json:"site_detail_url"`
+}
+
+type BoxArtImage struct {
+	IconBoxArt  string `json:"icon_url"`
+	ThumbBoxArt string `json:"thumb_url"`
+	LargeboxArt string `json:"super_url"`
 }
 
 type GiantBombSearchResponse struct {
-	Results []Results
+	Results []ResultsGame
 }
 
 // This function must be named ServeHTTP() and these argument methods must be in this order and *http.Request must be a reference
@@ -25,96 +56,58 @@ type GiantBombSearchResponse struct {
 // }
 
 func main() {
-	// 	var h Hello
-	// 	var key string = "f10f942d8c6c6a04af3c3774e257daa795c10589"
-	// 	var url string = "http://www.giantbomb.com/api/game/3030-4725/?api_key=f10f942d8c6c6a04af3c3774e257daa795c10589s"
+	http.HandleFunc("/", GetInit)
+	http.HandleFunc("/search", GetSearchResults)
 
-	// 	// ListenAndServce takes a url and port number and the second is an instance of the Hello object...
-	// 	// ... This is where the method will search and call the ServeHTTP method
-	// 	err := http.ListenAndServe("localhost:5050", h)
-	// 	checkError(err)
-
-	// 	http.HandleFunc("/search", func(w http.ResponseWriter, r *http.Request ) {
-	// 		var result
-	// 	})
-	// }
-
-	// func checkError(err error) {
-	// 	if err != nil {
-	// 		panic(err)
-	// 	}
-
-	results, _ := search("http://www.giantbomb.com/api/game/3030-4725/?api_key=f10f942d8c6c6a04af3c3774e257daa795c10589&format=json")
-	fmt.Printf("Results : %+v", results)
-	// fmt.Print(content)
-	// games := gamesFromJSON(results)
-	// fmt.Print(games)
-
+	log.Fatal(http.ListenAndServe(":5050", nil))
 }
 
-// func search(query string) ([]) {
-
-// }
-
 func giantBombAPI(url string) ([]byte, error) {
+	// Get request to Giant Bomb
 	resp, err := http.Get(url)
 	if err != nil {
 		return []byte{}, err
 	}
-
-	// fmt.Printf("Giantbomb response type: %T\n", resp)
-
+	// close connectiong to response to ensure no resource leaks
 	defer resp.Body.Close()
-	// bytes, err := ioutil.ReadAll(resp.Body)
-	// if err != nil {
-	// 	// return []byte{}, err
-	// 	panic(err)
-	// }
-
-	// return string(bytes)
+	// read data from response body and return a slice of bytes
 	return ioutil.ReadAll(resp.Body)
 
 }
 
-// You are getting an empty slice when []Results, but if it is not a slice you get the correct outcome.
-func search(query string) ([]Results, error) {
+func search(query string) ([]ResultsGame, error) {
 	var g GiantBombSearchResponse
-	body, err := giantBombAPI(query)
+	// fmt.Println(searchURL + key + url.QueryEscape(query))
+	body, err := giantBombAPI(searchURL + key + query)
 	if err != nil {
-		return []Results{}, err
+		return []ResultsGame{}, err
 	}
 	err = json.Unmarshal(body, &g)
+	fmt.Println("From search func: ", g.Results)
 	return g.Results, err
 
 }
 
-// func gamesFromJSON(content string) []Game {
-// 	games := make([]Game, 0, 20)
-// 	// use the a json decoder to decode a string object that is read by the string reader
-// 	fmt.Print("From fameFromJson: \n", content)
-// 	decoder := json.NewDecoder(strings.NewReader(content))
-// 	// This removes the array brackets that wrap the json results
-// 	// This appear to only be visible if there is more than one json object
-// 	// Will this error if there is no array brackets to remove?
-// 	// _, err := decoder.Token()
-// 	// if err != nil {
-// 	// 	// return []byte{}, err
-// 	// 	panic(err)
-// 	// }
-// 	var game Game
-// 	fmt.Print("The decode prior to decoder.More() \n", decoder)
-// 	for decoder.More() {
-// 		// This parses the json and pull only the fields that match the ones in my stuct
-// 		err := decoder.Decode(&game)
-// 		if err != nil {
-// 			// return []byte{}, err
-// 			panic(err)
-// 		}
-// 		games = append(games, game)
-// 	}
-// 	return games
-// }
+/////////////////////// ROUTES! ////////////////////
+func GetInit(writer http.ResponseWriter, req *http.Request) {
+	fmt.Fprintf(writer, "We runnin'.")
+}
 
-// func anotherGamesJSON(content string) []Game {
+func GetSearchResults(writer http.ResponseWriter, req *http.Request) {
+	var results []ResultsGame
+	var err error
+	fmt.Println(searchURL + key + url.QueryEscape("&format=json&query='resident evil'&resources=game"))
+	fmt.Println(searchURL + key + "&format=json&query=%27resident%20evil%27&resources=game")
+	results, err = search("&format=json&query=%27resident%20evil%27&resources=game")
+	checkRequestError(writer, err)
+	fmt.Println("From GetSearchResults: ", results)
+	encoder := json.NewEncoder(writer)
+	err = encoder.Encode(results)
+	checkRequestError(writer, err)
+}
 
-// }
+func checkRequestError(writer http.ResponseWriter, err error) {
+	if err != nil {
+		http.Error(writer, err.Error(), http.StatusInternalServerError)
+	}
+}
